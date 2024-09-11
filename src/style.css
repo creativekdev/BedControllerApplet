@@ -1,0 +1,15 @@
+/* Additional styles if needed */
+.card-title {
+    font-size: 1.25rem;
+  }
+  
+  #logViewer {
+    background-color: #f9f9f9;
+    font-family: monospace;
+    font-size: 0.9rem;
+  }
+  
+  button {
+    font-size: 1.1rem;
+  }
+  
