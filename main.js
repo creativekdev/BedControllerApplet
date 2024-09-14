@@ -1,9 +1,10 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
-const SerialPort = require('serialport');
+const {SerialPort, SerialPortMock } = require('serialport');
 const path = require('path');
 
 let mainWindow;
 let currentPort;
+
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -24,36 +25,40 @@ function createWindow() {
 app.whenReady().then(createWindow);
 
 ipcMain.handle('list-ports', async () => {
+  console.log('list-ports IPC triggered');  // Confirm the IPC event is called
+  
   try {
+
+
     const ports = await SerialPort.list();
     return ports;
-  } catch (error) {
-    console.error('Error listing ports:', error);
-    return [];
+  } catch (err) {
+    return { error: err.message };
   }
+
 });
 
 ipcMain.on('connect-port', (event, portPath, baudRate) => {
-  currentPort = new SerialPort(portPath, {
-    baudRate: parseInt(baudRate),
-    autoOpen: false
-  });
+  console.log('connect-port IPC triggered'); 
+  try {
+    currentPort = new SerialPort({ path:portPath, baudRate: Number(baudRate) });
+    console.log('initialized:' + currentPort); 
 
-  currentPort.open((err) => {
-    if (err) {
-      console.error('Error opening port:', err.message);
-      event.reply('connection-error', err.message);
-    } else {
-      event.reply('connection-success', `Connected to ${portPath}`);
-    }
-  });
+/*    currentPort.on('data', (data) => {
+      event.sender.send('serial-data', data.toString());
+    });*/
 
-  currentPort.on('data', (data) => {
-    mainWindow.webContents.send('log-data', data.toString());
-  });
+    return { success: true, message: `Connected to ${path}` };
+  } catch (err) {
+    console.log('Exception:' + err.message); 
+
+    return { success: false, message: err.message };
+  }
 });
 
 ipcMain.on('send-command', (event, command) => {
+  console.log('send-command:' + command); 
+
   if (currentPort && currentPort.isOpen) {
     currentPort.write(command + '\n', (err) => {
       if (err) {

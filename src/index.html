@@ -46,7 +46,10 @@
 
     // Load COM ports
     async function loadPorts() {
+      console.log("loadPorts Started!")
       const ports = await window.electronAPI.listPorts();
+      console.log(ports);
+
       portSelect.innerHTML = '';
       ports.forEach((port) => {
         const option = document.createElement('option');
@@ -54,6 +57,8 @@
         option.textContent = `${port.path} (${port.manufacturer || 'Unknown'})`;
         portSelect.appendChild(option);
       });
+      console.log("loadPorts Ended!")
+
     }
 
     // Connect to COM port
@@ -76,6 +81,12 @@
       logViewer.scrollTop = logViewer.scrollHeight;
     });
 
+    function listPorts() {
+      loadPorts();
+      setTimeout(listPorts, 2000);
+    }
+
+//    setTimeout(listPorts, 2000); // Fetch ports every 2 seconds
     // Initialize
     loadPorts();
   </script>
