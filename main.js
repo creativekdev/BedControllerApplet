@@ -18,7 +18,7 @@ function createWindow() {
   });
 
   mainWindow.loadFile('src/index.html');
-  mainWindow.webContents.openDevTools();  // Open DevTools
+ // mainWindow.webContents.openDevTools();  // Open DevTools
 
 }
 
@@ -47,11 +47,17 @@ ipcMain.on('connect-port', (event, portPath, baudRate) => {
 /*    currentPort.on('data', (data) => {
       event.sender.send('serial-data', data.toString());
     });*/
-
+    // Handle incoming serial data and send it to the renderer
+    currentPort.on('data', (data) => {
+      event.sender.send('log-data', data.toString());  // Send data to renderer for log
+    });
+    // Send success response to renderer
+    event.sender.send('connection-status', { success: true, message: `Connected to ${portPath}` });
     return { success: true, message: `Connected to ${path}` };
   } catch (err) {
     console.log('Exception:' + err.message); 
-
+    // Send failure response to renderer
+    event.sender.send('connection-status', { success: false, message: err.message });
     return { success: false, message: err.message };
   }
 });
@@ -62,12 +68,15 @@ ipcMain.on('send-command', (event, command) => {
   if (currentPort && currentPort.isOpen) {
     currentPort.write(command + '\n', (err) => {
       if (err) {
+        event.reply('log-data', `Error sending command: ${err.message}`);  // Log error in renderer
         event.reply('command-error', err.message);
       } else {
+        event.reply('log-data', `Command sent successfully: ${command}`);  // Log success in renderer
         event.reply('command-success', `Sent Command: ${command}`);
       }
     });
   } else {
+    event.reply('log-data', 'Error: Port is not open.');  // Log port not open error
     event.reply('command-error', 'Port is not open');
   }
 });

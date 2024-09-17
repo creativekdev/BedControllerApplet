@@ -44,6 +44,29 @@
     const connectButton = document.getElementById('connectButton');
     const logViewer = document.getElementById('logViewer');
 
+    // Change button color based on connection status
+    window.electronAPI.onConnectionStatus((status) => {
+      if (status.success) {
+        connectButton.classList.remove('btn-primary', 'btn-danger');
+        connectButton.classList.add('btn-success');  // Change to green if connected
+        connectButton.textContent = "Connected";     // Change button text to "Connected"
+      } else {
+        connectButton.classList.remove('btn-primary', 'btn-success');
+        connectButton.classList.add('btn-danger');   // Change to red if connection failed
+        connectButton.textContent = "Connection Failed"; // Update button text on failure
+      }
+    });
+
+    connectButton.addEventListener('click', () => {
+      const selectedPort = portSelect.value;
+      const baudRate = baudRateSelect.value;
+      window.electronAPI.connectPort(selectedPort, baudRate);
+
+      // Reset button appearance when clicking (before status is received)
+      connectButton.classList.remove('btn-success', 'btn-danger');
+      connectButton.classList.add('btn-primary');
+      connectButton.textContent = "Connecting...";
+    });
     // Load COM ports
     async function loadPorts() {
       console.log("loadPorts Started!")
@@ -70,6 +93,13 @@
 
     // Send command
     function sendCommand(command) {
+      // Log the command being sent
+      const logEntry = document.createElement('div');
+      logEntry.textContent = `Sending Command: ${command}`;
+      logViewer.appendChild(logEntry);  // Add the log entry to the logViewer
+      logViewer.scrollTop = logViewer.scrollHeight;  // Auto-scroll to the bottom
+
+      // Send the command to the device
       window.electronAPI.sendCommand(command);
     }
 
