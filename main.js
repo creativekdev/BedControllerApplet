@@ -1,10 +1,9 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
-const {SerialPort, SerialPortMock } = require('serialport');
+const { SerialPort } = require('serialport');
 const path = require('path');
 
 let mainWindow;
 let currentPort;
-
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -18,78 +17,100 @@ function createWindow() {
   });
 
   mainWindow.loadFile('src/index.html');
- // mainWindow.webContents.openDevTools();  // Open DevTools
-
 }
 
 app.whenReady().then(createWindow);
 
+// List available serial ports
 ipcMain.handle('list-ports', async () => {
-  console.log('list-ports IPC triggered');  // Confirm the IPC event is called
-  
+  console.log('list-ports IPC triggered');  
   try {
-
-
     const ports = await SerialPort.list();
     return ports;
   } catch (err) {
     return { error: err.message };
   }
-
 });
 
+// Connect to the serial port
 ipcMain.on('connect-port', (event, portPath, baudRate) => {
-  console.log('connect-port IPC triggered'); 
-  try {
-    currentPort = new SerialPort({ path:portPath, baudRate: Number(baudRate) });
-    console.log('initialized:' + currentPort); 
+  console.log(`Attempting to connect to ${portPath} at baud rate ${baudRate}`);
 
-/*    currentPort.on('data', (data) => {
-      event.sender.send('serial-data', data.toString());
-    });*/
-    // Handle incoming serial data and send it to the renderer
-    currentPort.on('data', (data) => {
-      event.sender.send('log-data', data.toString());  // Send data to renderer for log
-    });
-    
-    currentPort.write('x', (err) => {
+  // Close the previous port if it's open
+  if (currentPort && currentPort.isOpen) {
+    currentPort.close((err) => {
       if (err) {
-        event.reply('log-data', `Error sending command: ${err.message}`);  // Log error in renderer
-        event.reply('command-error', err.message);
+        console.error('Error closing previous port:', err.message);
       } else {
-        event.reply('log-data', `Command sent successfully: ${command}`);  // Log success in renderer
-        event.reply('command-success', `Sent Command: ${command}`);
+        console.log('Previous port closed');
       }
     });
-    // Send success response to renderer
-    event.sender.send('connection-status', { success: true, message: `Connected to ${portPath}` });
-    return { success: true, message: `Connected to ${path}` };
+  }
+
+  try {
+    // Open the new serial port
+    currentPort = new SerialPort({ path: portPath, baudRate: Number(baudRate) }, (err) => {
+      if (err) {
+        console.error('Error opening port:', err.message);
+        event.sender.send('connection-status', { success: false, message: `Error opening port: ${err.message}` });
+        return;
+      }
+
+      console.log(`Port opened successfully on ${portPath}`);
+      event.sender.send('connection-status', { success: true, message: `Connected to ${portPath}` });
+
+      // Handle incoming serial data
+      currentPort.on('data', (data) => {
+        console.log('Data received:', data.toString()); // Add log for debugging
+        event.sender.send('log-data', data.toString());
+      });
+
+      // Handle port error
+      currentPort.on('error', (err) => {
+        console.error('Port error:', err.message);
+        event.sender.send('log-data', `Port Error: ${err.message}`);
+      });
+    });
   } catch (err) {
-    console.log('Exception:' + err.message); 
-    // Send failure response to renderer
+    console.log('Exception:', err.message);
     event.sender.send('connection-status', { success: false, message: err.message });
-    return { success: false, message: err.message };
   }
 });
 
+// Send a command to the serial port
 ipcMain.on('send-command', (event, command) => {
-  console.log('send-command:' + command); 
+  console.log('send-command:', command);
 
-  if (currentPort) {
+  if (currentPort && currentPort.isOpen) {
     currentPort.write(command, (err) => {
       if (err) {
-        event.reply('log-data', `Error sending command: ${err.message}`);  // Log error in renderer
+        event.reply('log-data', `Error sending command: ${err.message}`);
         event.reply('command-error', err.message);
       } else {
-        event.reply('log-data', `Command sent successfully: ${command}`);  // Log success in renderer
+        event.reply('log-data', `Command sent successfully: ${command}`);
         event.reply('command-success', `Sent Command: ${command}`);
       }
     });
   } else {
-    event.reply('log-data', 'Error: Port is not open.');  // Log port not open error
+    event.reply('log-data', 'Error: Port is not open.');
     event.reply('command-error', 'Port is not open');
   }
 });
 
+// Handle application shutdown
+app.on('window-all-closed', () => {
+  if (currentPort && currentPort.isOpen) {
+    currentPort.close(() => {
+      console.log('Serial port closed on app shutdown');
+    });
+  }
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
 
-
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});

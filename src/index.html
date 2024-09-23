@@ -84,12 +84,6 @@
 
     }
 
-    // Connect to COM port
-    connectButton.addEventListener('click', () => {
-      const selectedPort = portSelect.value;
-      const baudRate = baudRateSelect.value;
-      window.electronAPI.connectPort(selectedPort, baudRate);
-    });
 
     // Send command
     function sendCommand(command) {
