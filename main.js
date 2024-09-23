@@ -51,6 +51,16 @@ ipcMain.on('connect-port', (event, portPath, baudRate) => {
     currentPort.on('data', (data) => {
       event.sender.send('log-data', data.toString());  // Send data to renderer for log
     });
+    
+    currentPort.write('x', (err) => {
+      if (err) {
+        event.reply('log-data', `Error sending command: ${err.message}`);  // Log error in renderer
+        event.reply('command-error', err.message);
+      } else {
+        event.reply('log-data', `Command sent successfully: ${command}`);  // Log success in renderer
+        event.reply('command-success', `Sent Command: ${command}`);
+      }
+    });
     // Send success response to renderer
     event.sender.send('connection-status', { success: true, message: `Connected to ${portPath}` });
     return { success: true, message: `Connected to ${path}` };
@@ -65,8 +75,8 @@ ipcMain.on('connect-port', (event, portPath, baudRate) => {
 ipcMain.on('send-command', (event, command) => {
   console.log('send-command:' + command); 
 
-  if (currentPort && currentPort.isOpen) {
-    currentPort.write(command + '\n', (err) => {
+  if (currentPort) {
+    currentPort.write(command, (err) => {
       if (err) {
         event.reply('log-data', `Error sending command: ${err.message}`);  // Log error in renderer
         event.reply('command-error', err.message);
